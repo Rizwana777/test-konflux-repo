@@ -53,6 +53,8 @@ FROM scratch
 # FROM --platform=$BUILDPLATFORM golang:1.22
 # Then run 'docker run -it --rm (container image) bash'
 
+# Set the user to the newly created user
+USER 999
 
 WORKDIR /
 
