@@ -19,7 +19,7 @@ RUN NODE_ENV='production' yarn build
 ####################################################################################################
 # Rollout Controller Build stage which performs the actual build of argo-rollouts binaries
 ####################################################################################################
-FROM --platform=$BUILDPLATFORM golang:1.22 AS argo-rollouts-build
+FROM --platform=$BUILDPLATFORM golang:1.21 AS argo-rollouts-build
 
 # WORKDIR /go/src/github.com/argoproj/argo-rollouts
 
@@ -33,6 +33,12 @@ COPY --from=argo-rollouts-ui /dist/app ./ui/dist/app
 
 # Perform the build
 COPY argo-rollouts . 
+
+# Use distroless as minimal base image to package the manager binary
+# Refer to https://github.com/GoogleContainerTools/distroless for more details
+FROM gcr.io/distroless/static:nonroot
+WORKDIR /
+COPY --from=builder /workspace/manager /usr/local/bin/manager
 
 # stop make from trying to re-build this without yarn installed
 RUN touch ui/dist/node_modules.marker && \
