@@ -6,7 +6,7 @@ spec:
   params:
     - name: IMAGE_URL
       description: 'The Argo Rollouts image to test'
-      default: 'quay.io/redhat-user-workloads/rh-ee-rnaaz-tenant/test-konflux-application/test-konflux-repo:bff5f747dd1b5c22e012c849f542ffc6747e4cf1'
+      default: 'quay.io/redhat-user-workloads/rh-ee-rnaaz-tenant/test-konflux-application/test-konflux-repo:6982eadb33629d194d91282d31929b1b262e8741'
     - name: EXPECTED_BINARIES
       description: 'List of binaries expected in the image'
       default: 'kubectl-argo-rollouts-linux-amd64,kubectl-argo-rollouts-linux-arm64,kubectl-argo-rollouts-darwin-amd64,kubectl-argo-rollouts-darwin-arm64'
