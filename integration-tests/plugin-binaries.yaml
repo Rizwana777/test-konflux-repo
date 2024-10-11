@@ -1,0 +1,51 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: argo-rollouts-integration-test
+spec:
+  params:
+    - name: IMAGE_URL
+      description: 'The Argo Rollouts image to test'
+      default: 'quay.io/redhat-user-workloads/rh-ee-rnaaz-tenant/test-konflux-application/test-konflux-repo:bff5f747dd1b5c22e012c849f542ffc6747e4cf1'
+    - name: EXPECTED_BINARIES
+      description: 'List of binaries expected in the image'
+      default: 'kubectl-argo-rollouts-linux-amd64,kubectl-argo-rollouts-linux-arm64,kubectl-argo-rollouts-darwin-amd64,kubectl-argo-rollouts-darwin-arm64'
+  tasks:
+    - name: pull-and-verify-binaries
+      taskSpec:
+        params:
+          - name: IMAGE_URL
+          - name: EXPECTED_BINARIES
+        steps:
+          # Step 1: Pull the image
+          - name: pull-image
+            image: registry.access.redhat.com/ubi8/ubi
+            script: |
+              echo "Pulling the image $(params.IMAGE_URL)..."
+              podman pull $(params.IMAGE_URL)
+          
+          # Step 2: Extract the binaries
+          - name: extract-binaries
+            image: registry.access.redhat.com/ubi8/ubi
+            script: |
+              echo "Extracting binaries from $(params.IMAGE_URL)..."
+              podman create --name argo-rollouts-test $(params.IMAGE_URL)
+              podman cp argo-rollouts-test:/kubectl-argo-rollouts-linux-amd64 ./kubectl-argo-rollouts-linux-amd64
+              podman cp argo-rollouts-test:/kubectl-argo-rollouts-linux-arm64 ./kubectl-argo-rollouts-linux-arm64
+              podman cp argo-rollouts-test:/kubectl-argo-rollouts-darwin-amd64 ./kubectl-argo-rollouts-darwin-amd64
+              podman cp argo-rollouts-test:/kubectl-argo-rollouts-darwin-arm64 ./kubectl-argo-rollouts-darwin-arm64
+
+          # Step 3: Verify that the expected binaries exist
+          - name: verify-binaries
+            image: registry.access.redhat.com/ubi8/ubi
+            script: |
+              IFS=',' read -r -a binaries <<< "$(params.EXPECTED_BINARIES)"
+              for binary in "${binaries[@]}"; do
+                if [[ ! -f "./$binary" ]]; then
+                  echo "ERROR: $binary not found!"
+                  exit 1
+                else
+                  echo "$binary exists."
+                fi
+              done
+              echo "All expected binaries verified successfully!"
