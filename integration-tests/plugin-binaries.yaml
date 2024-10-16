@@ -18,40 +18,59 @@ spec:
             default: 'quay.io/redhat-user-workloads/rh-ee-rnaaz-tenant/test-konflux-application/test-konflux-repo:6982eadb33629d194d91282d31929b1b262e8741'
           - name: EXPECTED_BINARIES
             default: 'kubectl-argo-rollouts-linux-amd64,kubectl-argo-rollouts-linux-arm64,kubectl-argo-rollouts-darwin-amd64,kubectl-argo-rollouts-darwin-arm64'
+        volumes:
+          - name: oras-volume
+            emptyDir: {}  # Using an emptyDir volume to share data across steps
         steps:
-          # Step 1: Pull the image
-          - name: pull-image
-            image: registry.access.redhat.com/ubi8/ubi  
-            securityContext:
-              runAsUser: 0 
-            script: |
-              echo "Installing podman..."
-              yum install -y podman
-
-              echo "Debug..."
-              cat /etc/subuid
-              cat /etc/subgid
-
-              echo "Pulling the image $(params.IMAGE_URL)..."
-              podman pull $(params.IMAGE_URL)        
-          # Step 2: Extract the binaries
-          - name: extract-binaries
+          # Step 1: Install ORAS (version 1.2.0)
+          - name: install-oras
             image: registry.access.redhat.com/ubi8/ubi
             script: |
-              echo "Extracting binaries from $(params.IMAGE_URL)..."
-              podman create --name argo-rollouts-test $(params.IMAGE_URL)
-              podman cp argo-rollouts-test:/kubectl-argo-rollouts-linux-amd64 ./kubectl-argo-rollouts-linux-amd64
-              podman cp argo-rollouts-test:/kubectl-argo-rollouts-linux-arm64 ./kubectl-argo-rollouts-linux-arm64
-              podman cp argo-rollouts-test:/kubectl-argo-rollouts-darwin-amd64 ./kubectl-argo-rollouts-darwin-amd64
-              podman cp argo-rollouts-test:/kubectl-argo-rollouts-darwin-arm64 ./kubectl-argo-rollouts-darwin-arm64
+              VERSION="1.2.0"
+              echo "Installing ORAS version $VERSION..."
+              curl -LO "https://github.com/oras-project/oras/releases/download/v${VERSION}/oras_${VERSION}_linux_amd64.tar.gz"
+              mkdir -p /workspace/oras-install/
+              tar -zxf oras_${VERSION}_*.tar.gz -C /workspace/oras-install/
+              rm -rf oras_${VERSION}_*.tar.gz
+              
+              # Verify installation
+              /workspace/oras-install/oras version
+            volumeMounts:
+              - name: oras-volume
+                mountPath: /workspace/oras-install
 
-          # Step 3: Verify that the expected binaries exist
-          - name: verify-binaries
+          # Step 2: Pull the image and extract binaries using ORAS
+          - name: pull-and-extract
             image: registry.access.redhat.com/ubi8/ubi
             script: |
+              echo "Pulling the image $(params.IMAGE_URL) with ORAS and extracting binaries..."
+
+              # Create a directory for OCI layout
+              mkdir -p ./oci-layout
+
+              # Pull all image layers using ORAS and store in the OCI layout directory
+              /workspace/oras-install/oras copy $(params.IMAGE_URL) --to-oci-layout ./oci-layout
+
+              # List the pulled files
+              echo "Listing files in OCI layout:"
+              find ./oci-layout
+
+              # Move the binaries from the layout to ./image-files
+              mkdir -p ./image-files
+              cp ./oci-layout/blobs/sha256/* ./image-files
+              
+              # Extract the binaries
+              for blob in $(ls ./oci-layout/blobs/sha256/*); do
+                tar tf ${blob} &> /dev/null && tar tvf ${blob} | grep 'kubectl-argo-rollouts' &> /dev/null && tar xvf ${blob} -C ./image-files 'kubectl-argo-rollouts-*'
+              done
+              
+              echo "List the extracted files to verify"
+              ls ./image-files
+
+              echo "Verify that expected binaries exist"
               IFS=',' read -r -a binaries <<< "$(params.EXPECTED_BINARIES)"
               for binary in "${binaries[@]}"; do
-                if [[ ! -f "./$binary" ]]; then
+                if [[ ! -f "./image-files/$binary" ]]; then
                   echo "ERROR: $binary not found!"
                   exit 1
                 else
@@ -59,3 +78,6 @@ spec:
                 fi
               done
               echo "All expected binaries verified successfully!"
+            volumeMounts:
+              - name: oras-volume
+                mountPath: /workspace/oras-install
