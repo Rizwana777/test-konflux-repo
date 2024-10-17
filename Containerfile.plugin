@@ -39,6 +39,9 @@ USER root
 COPY argo-rollouts/go.mod argo-rollouts/go.sum ./
 RUN go mod download
 
+# Copy the .git directory to ensure Git commands work
+COPY argo-rollouts/.git .git
+
 # Copy UI files for plugin build
 COPY --from=argo-rollouts-ui /src/dist/app ./ui/dist/app
 

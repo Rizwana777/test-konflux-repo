@@ -39,8 +39,8 @@ spec:
               - name: oras-volume
                 mountPath: /workspace/oras-install
 
-          # Step 2: Pull the image and extract binaries using ORAS
-          - name: pull-and-extract
+          # Step 2: Pull the image, extract the binaries using ORAS and verify the expected binaries exist
+          - name: pull-extract-and-verify-binaries
             image: registry.access.redhat.com/ubi8/ubi
             script: |
               echo "Pulling the image $(params.IMAGE_URL) with ORAS and extracting binaries..."
@@ -55,22 +55,22 @@ spec:
               echo "Listing files in OCI layout:"
               find ./oci-layout
 
-              # Move the binaries from the layout to ./image-files
-              mkdir -p ./image-files
-              cp ./oci-layout/blobs/sha256/* ./image-files
+              # Move the binaries from the layout to ./platform-binaries
+              mkdir -p ./platform-binaries
+              cp ./oci-layout/blobs/sha256/* ./platform-binaries
               
               # Extract the binaries
               for blob in $(ls ./oci-layout/blobs/sha256/*); do
-                tar tf ${blob} &> /dev/null && tar tvf ${blob} | grep 'kubectl-argo-rollouts' &> /dev/null && tar xvf ${blob} -C ./image-files 'kubectl-argo-rollouts-*'
+                tar tf ${blob} &> /dev/null && tar tvf ${blob} | grep 'kubectl-argo-rollouts' &> /dev/null && tar xvf ${blob} -C ./platform-binaries 'kubectl-argo-rollouts-*'
               done
               
-              echo "List the extracted files to verify"
-              ls ./image-files
+              echo "List the extracted binaries to verify"
+              ls ./platform-binaries
 
               echo "Verify that expected binaries exist"
               IFS=',' read -r -a binaries <<< "$(params.EXPECTED_BINARIES)"
               for binary in "${binaries[@]}"; do
-                if [[ ! -f "./image-files/$binary" ]]; then
+                if [[ ! -f "./platform-binaries/$binary" ]]; then
                   echo "ERROR: $binary not found!"
                   exit 1
                 else
