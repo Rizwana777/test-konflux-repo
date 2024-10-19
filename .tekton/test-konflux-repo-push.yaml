@@ -25,6 +25,10 @@ spec:
     value: quay.io/redhat-user-workloads/rh-ee-rnaaz-tenant/test-konflux-application/test-konflux-repo:{{revision}}
   - name: dockerfile
     value: Containerfile.plugin
+  - name: hermetic
+    value: "true"
+  - name: prefetch-input
+    value: '{"type": "gomod", "path": "./argo-rollouts"}'
   pipelineSpec:
     description: |
       This pipeline is ideal for building container images from a Containerfile while maintaining trust after pipeline customization.

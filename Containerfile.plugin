@@ -8,8 +8,7 @@ WORKDIR /src
 # Copy the UI source files into the container
 COPY argo-rollouts/ui .
 
-# Install Yarn
-RUN npm install --global yarn
+RUN npm install --omit dev --loglevel verbose --global yarn
 
 # Set the user to the default non-root user provided by UBI
 USER root
