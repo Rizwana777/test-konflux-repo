@@ -6,7 +6,7 @@ spec:
   params:
     - name: IMAGE_URL
       description: 'The Argo Rollouts image to test'
-      default: 'quay.io/redhat-user-workloads/rh-ee-rnaaz-tenant/test-konflux-application/test-konflux-repo:6982eadb33629d194d91282d31929b1b262e8741'
+      default: ''
     - name: EXPECTED_BINARIES
       description: 'List of binaries expected in the image'
       default: 'kubectl-argo-rollouts-linux-amd64,kubectl-argo-rollouts-linux-arm64,kubectl-argo-rollouts-darwin-amd64,kubectl-argo-rollouts-darwin-arm64'
@@ -15,7 +15,7 @@ spec:
       taskSpec:
         params:
           - name: IMAGE_URL
-            default: 'quay.io/redhat-user-workloads/rh-ee-rnaaz-tenant/test-konflux-application/test-konflux-repo:6982eadb33629d194d91282d31929b1b262e8741'
+            default: ''
           - name: EXPECTED_BINARIES
             default: 'kubectl-argo-rollouts-linux-amd64,kubectl-argo-rollouts-linux-arm64,kubectl-argo-rollouts-darwin-amd64,kubectl-argo-rollouts-darwin-arm64'
         volumes:
@@ -43,7 +43,16 @@ spec:
           - name: pull-extract-and-verify-binaries
             image: registry.access.redhat.com/ubi8/ubi
             script: |
+              if [[ -z "$(params.IMAGE_URL)" ]]; then
+                echo "ERROR: IMAGE_URL is not provided."
+                exit 1
+              fi  
+                        
               echo "Pulling the image $(params.IMAGE_URL) with ORAS and extracting binaries..."
+
+              # Install the 'file' utility for binary type detection
+              echo "Installing 'file' utility..."
+              yum install -y file
 
               # Create a directory for OCI layout
               mkdir -p ./oci-layout
@@ -100,6 +109,10 @@ spec:
                   *darwin-arm64*)
                     echo "$binary is expected to be a 64-bit Darwin binary (ARM64)"
                     echo "$binary_arch" | grep 'Mach-O.*arm64' &> /dev/null || { echo "ERROR: Architecture mismatch for $binary"; exit 1; }
+                    ;;
+                  *windows-amd64*)
+                    echo "$binary is expected to be a 64-bit Windows binary (x86_64)"
+                    echo "$binary_arch" | grep 'PE32+ executable.*x86-64' &> /dev/null || { echo "ERROR: Architecture mismatch for $binary"; exit 1; }
                     ;;
                   *)
                     echo "Unknown binary: $binary"
