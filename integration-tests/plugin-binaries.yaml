@@ -77,7 +77,38 @@ spec:
                   echo "$binary exists."
                 fi
               done
-              echo "All expected binaries verified successfully!"
+              
+              echo "Verify binary architecture using the file command"
+              for binary in "${binaries[@]}"; do
+                binary_arch=$(file ./platform-binaries/$binary)
+                echo "Checking architecture of $binary: $binary_arch"
+
+                # Check for expected architecture based on binary name
+                case $binary in
+                  *linux-amd64*)
+                    echo "$binary is expected to be a 64-bit Linux binary (x86_64)"
+                    echo "$binary_arch" | grep '64-bit.*x86-64' &> /dev/null || { echo "ERROR: Architecture mismatch for $binary"; exit 1; }
+                    ;;
+                  *linux-arm64*)
+                    echo "$binary is expected to be a 64-bit Linux binary (ARM64)"
+                    echo "$binary_arch" | grep '64-bit.*ARM aarch64' &> /dev/null || { echo "ERROR: Architecture mismatch for $binary"; exit 1; }
+                    ;;
+                  *darwin-amd64*)
+                    echo "$binary is expected to be a 64-bit Darwin binary (x86_64)"
+                    echo "$binary_arch" | grep 'Mach-O.*x86_64' &> /dev/null || { echo "ERROR: Architecture mismatch for $binary"; exit 1; }
+                    ;;
+                  *darwin-arm64*)
+                    echo "$binary is expected to be a 64-bit Darwin binary (ARM64)"
+                    echo "$binary_arch" | grep 'Mach-O.*arm64' &> /dev/null || { echo "ERROR: Architecture mismatch for $binary"; exit 1; }
+                    ;;
+                  *)
+                    echo "Unknown binary: $binary"
+                    exit 1
+                    ;;
+                esac
+              done
+
+              echo "All expected binaries verified successfully with correct architectures!"              
             volumeMounts:
               - name: oras-volume
                 mountPath: /workspace/oras-install
