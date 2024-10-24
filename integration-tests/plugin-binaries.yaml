@@ -6,9 +6,6 @@ spec:
   params:
     - name: SNAPSHOT
       description: 'Snapshot of the application'
-    - name: IMAGE_URL
-      description: 'The Argo Rollouts image to test'
-      default: 'quay.io/redhat-user-workloads/rh-ee-rnaaz-tenant/test-konflux-application/test-konflux-repo:6982eadb33629d194d91282d31929b1b262e8741'
     - name: EXPECTED_BINARIES
       description: 'List of binaries expected in the image'
       default: 'kubectl-argo-rollouts-linux-amd64,kubectl-argo-rollouts-linux-arm64,kubectl-argo-rollouts-darwin-amd64,kubectl-argo-rollouts-darwin-arm64'
@@ -16,8 +13,6 @@ spec:
     - name: pull-and-verify-binaries
       taskSpec:
         params:
-          - name: IMAGE_URL
-            default: 'quay.io/redhat-user-workloads/rh-ee-rnaaz-tenant/test-konflux-application/test-konflux-repo:6982eadb33629d194d91282d31929b1b262e8741'
           - name: EXPECTED_BINARIES
             default: 'kubectl-argo-rollouts-linux-amd64,kubectl-argo-rollouts-linux-arm64,kubectl-argo-rollouts-darwin-amd64,kubectl-argo-rollouts-darwin-arm64'
         volumes:
@@ -45,16 +40,14 @@ spec:
           - name: pull-extract-and-verify-binaries
             image: registry.access.redhat.com/ubi8/ubi
             script: |
-              echo "Pulling the image $(params.IMAGE_URL) with ORAS and extracting binaries..."
-
+              # Install jq to extract values from SNAPSHOT
               dnf -y install jq
 
-              # Parse the SNAPSHOT parameter if needed
-              echo "Using snapshot information: $(params.SNAPSHOT)"
+              # Extract container image url from snapshot for testing
+              IMAGE_URL=$(echo '$(params.SNAPSHOT)' | jq -r '.components[0].containerImage')
+              echo "IMAGE_URL: $IMAGE_URL"
 
-              IMAGE=$(echo '$(params.SNAPSHOT)' | jq -r '.components[0].containerImage')
-              echo "IMAGE_URLO: $IMAGE"
-          
+              echo "Pulling the image $IMAGE_URL with ORAS and extracting binaries..."          
               # Install the 'file' utility for binary type detection
               echo "Installing 'file' utility..."
               yum install -y file
@@ -63,7 +56,7 @@ spec:
               mkdir -p ./oci-layout
 
               # Pull all image layers using ORAS and store in the OCI layout directory
-              /workspace/oras-install/oras copy $(params.IMAGE_URL) --to-oci-layout ./oci-layout
+              /workspace/oras-install/oras copy $IMAGE_URL --to-oci-layout ./oci-layout
 
               # List the pulled files
               echo "Listing files in OCI layout:"
