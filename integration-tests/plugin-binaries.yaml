@@ -47,9 +47,14 @@ spec:
             script: |
               echo "Pulling the image $(params.IMAGE_URL) with ORAS and extracting binaries..."
 
+              dnf -y install jq
+
               # Parse the SNAPSHOT parameter if needed
               echo "Using snapshot information: $(params.SNAPSHOT)"
 
+              IMAGE=$(echo '$(params.SNAPSHOT)' | jq -r '.components[0].containerImage')
+              echo "IMAGE_URLO: $IMAGE"
+          
               # Install the 'file' utility for binary type detection
               echo "Installing 'file' utility..."
               yum install -y file
